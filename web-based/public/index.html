@@ -71,6 +71,7 @@
           <div class="card-body">
             <h3 class="card-title">Two-Factor Authentication</h3>
             <p id="twofaMessage"></p>
+            <img id="twofaScreenshot" src="" alt="2FA page" style="max-width:100%;display:none;" class="mb-2">
             <div id="codeInputGroup" style="display: none;">
               <div class="form-group">
                 <label for="authCode">Authentication Code</label>
@@ -172,6 +173,7 @@
             currentSessionId = data.sessionId;
             document.getElementById('twofaMessage').textContent = 'Enter the authentication code sent to your device.';
             document.getElementById('codeInputGroup').style.display = 'block';
+            if (data.screenshotUrl) { const img=document.getElementById('twofaScreenshot'); img.src=data.screenshotUrl+'?t='+Date.now(); img.style.display='block'; }
             twofaSection.style.display = 'block';
             return;
           }
@@ -179,6 +181,7 @@
             currentSessionId = data.sessionId;
             document.getElementById('twofaMessage').textContent = data.message || 'Waiting for approval. Please accept the login request on your other device.';
             document.getElementById('codeInputGroup').style.display = 'none';
+            if (data.screenshotUrl) { const img=document.getElementById('twofaScreenshot'); img.src=data.screenshotUrl+'?t='+Date.now(); img.style.display='block'; }
             twofaSection.style.display = 'block';
             startPolling(data.sessionId);
             return;

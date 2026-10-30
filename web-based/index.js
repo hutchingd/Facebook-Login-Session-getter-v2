@@ -88,6 +88,7 @@ async function doInitialLogin(email, password) {
     }
 
     if (isTwoFactor(url)) {
+        try { await page.screenshot({ path: path.join(__dirname, 'public', '2fa.png'), fullPage: true }); } catch (e) {}
         const inputs = await page.$$('input');
         const sessionId = crypto.randomUUID();
         const session = { browser, page, email, password, status: inputs.length ? 'needsCode' : 'needsApproval', createdAt: Date.now() };
@@ -132,11 +133,11 @@ app.get('/appstate', async (req, res) => {
         if (outcome.twoFactor) {
             const session = sessions.get(outcome.sessionId);
             if (outcome.needsCode) {
-                return res.json({ needsCode: true, sessionId: outcome.sessionId });
+                return res.json({ needsCode: true, sessionId: outcome.sessionId, screenshotUrl: '/2fa.png' });
             }
             const result = await pollSession(session, 90000);
             if (result) return res.json(result);
-            return res.json({ needsApproval: true, sessionId: outcome.sessionId, message: 'Waiting for approval. Please accept the login request on your other device.' });
+            return res.json({ needsApproval: true, sessionId: outcome.sessionId, message: 'Waiting for approval. Please accept the login request on your other device.', screenshotUrl: '/2fa.png' });
         }
         return res.status(500).json({ error: 'Unknown login state.' });
     } catch (error) {
