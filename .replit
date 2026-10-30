@@ -1,4 +1,4 @@
-entrypoint = "index.js"
+entrypoint = "web-based/index.js"
 modules = ["nodejs-20"]
 hidden = [".config", "package-lock.json"]
 

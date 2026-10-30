@@ -27,10 +27,10 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY web-based/package*.json ./
 RUN npm install --omit=dev
 
-COPY . .
+COPY web-based/ .
 
 EXPOSE 3000
 
