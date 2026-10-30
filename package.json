@@ -10,11 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^18.0.6",
     "express": "^4.21.0",
-     "puppeteer": "^23.5.1",
-    "freeport": "^1.0.5",
-    "proxy-chain": "^2.5.3",
     "puppeteer-core": "^23.5.1"
   }
 }

@@ -14,12 +14,12 @@
   <style>
     .btn-custom {
       color: #fff;
-      background-color: #7bc043; 
+      background-color: #7bc043;
       border-color: #7bc043;
     }
 
     .btn-custom:hover {
-      background-color: #64a737; 
+      background-color: #64a737;
       border-color: #64a737;
     }
 
@@ -64,6 +64,30 @@
         </div>
       </div>
     </div>
+
+    <div class="row mt-3" id="twofaSection" style="display: none;">
+      <div class="col-md-6 offset-md-3">
+        <div class="card">
+          <div class="card-body">
+            <h3 class="card-title">Two-Factor Authentication</h3>
+            <p id="twofaMessage"></p>
+            <div id="codeInputGroup" style="display: none;">
+              <div class="form-group">
+                <label for="authCode">Authentication Code</label>
+                <input type="text" class="form-control" id="authCode" name="authCode">
+              </div>
+              <button type="button" class="btn btn-custom btn-block" id="submitCodeButton">Submit Code</button>
+            </div>
+            <div class="text-center mt-2" id="twofaLoading" style="display: none;">
+              <div class="spinner-border text-success" role="status">
+                <span class="sr-only">Loading...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="row mt-3" id="responseSection" style="display: none;">
       <div class="col-md-6 offset-md-3">
         <div class="card">
@@ -88,52 +112,108 @@
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
   <script>
+    let currentSessionId = null;
+    let pollTimer = null;
+
     document.getElementById('togglePassword').addEventListener('click', function () {
       const passwordField = document.getElementById('password');
       const toggleButton = document.getElementById('togglePassword');
       const isPasswordVisible = passwordField.type === 'text';
-
       passwordField.type = isPasswordVisible ? 'password' : 'text';
       toggleButton.textContent = isPasswordVisible ? 'Show' : 'Hide';
     });
 
+    function showResponse(data) {
+      document.getElementById('response').textContent = JSON.stringify(data.jsonCookies, null, 2);
+      document.getElementById('datrResponse').textContent = data.datr || 'No datr cookie found';
+      document.getElementById('cookiesResponse').textContent = data.cookies || 'No cookies found';
+      document.getElementById('responseSection').style.display = 'block';
+    }
+
+    function startPolling(sessionId) {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(function() {
+        fetch('/status?session=' + encodeURIComponent(sessionId))
+          .then(r => r.json())
+          .then(data => {
+            if (data.error) { clearInterval(pollTimer); alert(data.error); return; }
+            if (data.pending) {
+              document.getElementById('twofaMessage').textContent = data.message || 'Waiting for approval...';
+              return;
+            }
+            clearInterval(pollTimer);
+            document.getElementById('twofaSection').style.display = 'none';
+            showResponse(data);
+          })
+          .catch(err => { console.error(err); });
+      }, 3000);
+    }
+
     document.getElementById('loginForm').addEventListener('submit', function(event) {
-      event.preventDefault(); 
+      event.preventDefault();
       const mobile = document.getElementById('mobile').value;
       const password = document.getElementById('password').value;
       const loginButton = document.getElementById('loginButton');
       const loadingIndicator = document.getElementById('loadingIndicator');
       const responseSection = document.getElementById('responseSection');
-      const responseElement = document.getElementById('response');
-      const datrResponseElement = document.getElementById('datrResponse');
-      const cookiesResponseElement = document.getElementById('cookiesResponse');
+      const twofaSection = document.getElementById('twofaSection');
 
       loadingIndicator.style.display = 'block';
       loginButton.disabled = true;
       responseSection.style.display = 'none';
+      twofaSection.style.display = 'none';
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
-      fetch(`/appstate?e=${mobile}&p=${password}`)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Incorrect password');
-          }
-          return response.json();
-        })
+      fetch('/appstate?e=' + encodeURIComponent(mobile) + '&p=' + encodeURIComponent(password))
+        .then(response => response.json())
         .then(data => {
-          responseElement.textContent = JSON.stringify(data.jsonCookies, null, 2);
-          datrResponseElement.textContent = data.datr || 'No datr cookie found';
-          cookiesResponseElement.textContent = data.cookies || 'No cookies found';
-          responseSection.style.display = 'block';
+          if (data.error) { alert(data.error); return; }
+          if (data.needsCode) {
+            currentSessionId = data.sessionId;
+            document.getElementById('twofaMessage').textContent = 'Enter the authentication code sent to your device.';
+            document.getElementById('codeInputGroup').style.display = 'block';
+            twofaSection.style.display = 'block';
+            return;
+          }
+          if (data.needsApproval) {
+            currentSessionId = data.sessionId;
+            document.getElementById('twofaMessage').textContent = data.message || 'Waiting for approval. Please accept the login request on your other device.';
+            document.getElementById('codeInputGroup').style.display = 'none';
+            twofaSection.style.display = 'block';
+            startPolling(data.sessionId);
+            return;
+          }
+          showResponse(data);
         })
         .catch(error => {
-          responseElement.textContent = '';
-          datrResponseElement.textContent = '';
-          cookiesResponseElement.textContent = '';
-          alert(error.message); 
+          alert(error.message);
         })
         .finally(() => {
           loadingIndicator.style.display = 'none';
           loginButton.disabled = false;
+        });
+    });
+
+    document.getElementById('submitCodeButton').addEventListener('click', function() {
+      const code = document.getElementById('authCode').value;
+      if (!currentSessionId || !code) { alert('Code required'); return; }
+      document.getElementById('twofaLoading').style.display = 'block';
+      fetch('/submit-code?session=' + encodeURIComponent(currentSessionId) + '&code=' + encodeURIComponent(code))
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) { alert(data.error); return; }
+          if (data.pending) {
+            document.getElementById('twofaMessage').textContent = data.message || 'Waiting for approval...';
+            document.getElementById('codeInputGroup').style.display = 'none';
+            startPolling(currentSessionId);
+            return;
+          }
+          document.getElementById('twofaSection').style.display = 'none';
+          showResponse(data);
+        })
+        .catch(err => { alert(err.message); })
+        .finally(() => {
+          document.getElementById('twofaLoading').style.display = 'none';
         });
     });
 
@@ -142,14 +222,9 @@
       const datrText = document.getElementById('datrResponse').textContent;
       const cookiesText = document.getElementById('cookiesResponse').textContent;
       const combinedText = `Appstate:\n${responseText}\n\nDatr Cookies\ndatr=${datrText}\n\nCookies:\n${cookiesText}`;
-
       navigator.clipboard.writeText(combinedText)
-        .then(() => {
-          alert('Appstate and data copied to clipboard');
-        })
-        .catch(error => {
-          console.error('Error copying to clipboard:', error);
-        });
+        .then(() => { alert('Appstate and data copied to clipboard'); })
+        .catch(error => { console.error('Error copying to clipboard:', error); });
     });
   </script>
 </body>
