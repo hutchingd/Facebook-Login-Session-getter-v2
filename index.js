@@ -63,8 +63,9 @@ async function doInitialLogin(email, password) {
     await page.focus('input[name="pass"]');
     await Promise.all([
         page.keyboard.press('Enter'),
-        page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {})
+        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {})
     ]);
+    await new Promise(r => setTimeout(r, 5000));
 
     const url = page.url();
     const cookies = await page.cookies();
