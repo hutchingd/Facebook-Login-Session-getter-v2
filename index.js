@@ -2,6 +2,18 @@ const express = require('express');
 const puppeteer = require('puppeteer-core');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
+
+function findChromium() {
+    if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+        return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    const candidates = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/repl/tools/bin/chromium'];
+    for (const c of candidates) {
+        if (fs.existsSync(c)) return c;
+    }
+    return undefined;
+}
 
 const app = express();
 const sessions = new Map();
@@ -11,7 +23,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 async function initializeBrowser() {
     return puppeteer.launch({
         headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/repl/tools/bin/chromium',
+        executablePath: findChromium(),
         ignoreHTTPSErrors: true,
         args: [
             '--ignore-certificate-errors',
